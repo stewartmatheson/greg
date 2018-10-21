@@ -107,7 +107,7 @@ func captureInput(question string) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print(question)
 	text, _ := reader.ReadString('\n')
-	return text
+	return strings.TrimSuffix(text, "\n")
 }
 
 func askQuestion(question string, options []string) string {
@@ -131,6 +131,19 @@ func askQuestion(question string, options []string) string {
 	return response
 }
 
+func resolveConfigurationType(textAnswer string) (configurationType, error) {
+	if textAnswer == "C" {
+		return Context, nil
+	}
+
+	if textAnswer == "I" {
+		return Image, nil
+	}
+
+	// Can't retrun nil here so I guess we return anything as the first param
+	return Context, errors.New("Unknown configuration type")
+}
+
 func main() {
 	configuration := readConfigurationLayer()
 	dockerCompose := readDockerCompose()
@@ -139,14 +152,27 @@ func main() {
 		question := "Should " + applicationName + " point to image or context"
 		answer := askQuestion(question, []string{"I", "C"})
 
+		// Here I have a whole function to get the configuration type from the user answer
+		// There might be a better way to do this. I'm not sure. I have a feeling using
+		// strings in an enum is not the most idomatic go
+		answeredConfigurationType, err := resolveConfigurationType(answer)
+
+		if err != nil {
+			fmt.Println(err)
+			// For now let's just give up
+			os.Exit(1)
+		}
+
 		// In go we can't assign directly to a struct within a map as they are not directly
 		// addressable. We work around with a tempory assignment
 		currentDockerComposeApplication := dockerCompose.Services[applicationName]
-		if configurationType(answer) == Context {
+		if answeredConfigurationType == Context {
 			currentDockerComposeApplication.Context = configurationApplication.Context
+			currentDockerComposeApplication.Image = ""
 			fmt.Println("Using Context in " + applicationName)
 		} else {
 			currentDockerComposeApplication.Image = configurationApplication.Image
+			currentDockerComposeApplication.Context = ""
 			fmt.Println("Using Image in " + applicationName)
 		}
 		dockerCompose.Services[applicationName] = currentDockerComposeApplication
