@@ -15,7 +15,7 @@ import (
 
 type dockerComposeApplication struct {
 	Image       string   `yaml:"image,omitempty"`
-	Context     string   `yaml:"context,omitempty"`
+	Build       string   `yaml:"build,omitempty"`
 	Ports       []string `yaml:"ports,omitempty"`
 	Volumes     []string `yaml:"volumes,omitempty"`
 	Environment []string `yaml:"environment,omitempty"`
@@ -26,8 +26,8 @@ type dockerComposeApplication struct {
 type configurationType string
 
 const (
-	// Context ... Comment
-	Context configurationType = "C"
+	// Build ... Comment
+	Build configurationType = "B"
 
 	// Image ... Comment
 	Image configurationType = "I"
@@ -38,8 +38,8 @@ func (d dockerComposeApplication) configuredFor() (configurationType, error) {
 		return Image, nil
 	}
 
-	if len(d.Context) > 0 {
-		return Context, nil
+	if len(d.Build) > 0 {
+		return Build, nil
 	}
 
 	return "", errors.New("Invalid Configuration")
@@ -51,7 +51,7 @@ type dockerCompose struct {
 }
 
 func readDockerCompose() dockerCompose {
-	dockerComposeFile, err := ioutil.ReadFile("docker-compose.yml")
+	dockerComposeFile, err := ioutil.ReadFile(".docker-compose.yml")
 
 	if err != nil {
 		log.Printf("Can not load applications file #%v ", err)
@@ -68,8 +68,8 @@ func readDockerCompose() dockerCompose {
 }
 
 type configurationLayerApplication struct {
-	Context string `yaml:"context,omitempty"`
-	Image   string `yaml:"image,omitempty"`
+	Build string `yaml:"build,omitempty"`
+	Image string `yaml:"image,omitempty"`
 }
 
 type configurationLayer struct {
@@ -100,7 +100,7 @@ func writeNewDockerCompose(dockerCompose dockerCompose) {
 		log.Printf("Can not marshal docker compose configuration #%v ", err)
 	}
 
-	ioutil.WriteFile("./docker-compose-out.yml", out, 500)
+	ioutil.WriteFile("./docker-compose.yml", out, 500)
 }
 
 func captureInput(question string) string {
@@ -132,8 +132,8 @@ func askQuestion(question string, options []string) string {
 }
 
 func resolveConfigurationType(textAnswer string) (configurationType, error) {
-	if textAnswer == "C" {
-		return Context, nil
+	if textAnswer == "B" {
+		return Build, nil
 	}
 
 	if textAnswer == "I" {
@@ -141,7 +141,7 @@ func resolveConfigurationType(textAnswer string) (configurationType, error) {
 	}
 
 	// Can't retrun nil here so I guess we return anything as the first param
-	return Context, errors.New("Unknown configuration type")
+	return Build, errors.New("Unknown configuration type")
 }
 
 func main() {
@@ -150,7 +150,7 @@ func main() {
 
 	for applicationName, configurationApplication := range configuration.Applications {
 		question := "Should " + applicationName + " point to image or context"
-		answer := askQuestion(question, []string{"I", "C"})
+		answer := askQuestion(question, []string{"I", "B"})
 
 		// Here I have a whole function to get the configuration type from the user answer
 		// There might be a better way to do this. I'm not sure. I have a feeling using
@@ -166,13 +166,13 @@ func main() {
 		// In go we can't assign directly to a struct within a map as they are not directly
 		// addressable. We work around with a tempory assignment
 		currentDockerComposeApplication := dockerCompose.Services[applicationName]
-		if answeredConfigurationType == Context {
-			currentDockerComposeApplication.Context = configurationApplication.Context
+		if answeredConfigurationType == Build {
+			currentDockerComposeApplication.Build = configurationApplication.Build
 			currentDockerComposeApplication.Image = ""
-			fmt.Println("Using Context in " + applicationName)
+			fmt.Println("Using Build in " + applicationName)
 		} else {
 			currentDockerComposeApplication.Image = configurationApplication.Image
-			currentDockerComposeApplication.Context = ""
+			currentDockerComposeApplication.Build = ""
 			fmt.Println("Using Image in " + applicationName)
 		}
 		dockerCompose.Services[applicationName] = currentDockerComposeApplication
